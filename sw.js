@@ -1,6 +1,6 @@
 const CACHE_NAME = "nisso-pwa-v1";
 const APP_SHELL = [
-  "./nisso-codexapp",
+  "./",
   "./index.html",
   "./styles.css",
   "./app.js",

@@ -19,6 +19,7 @@ let state = {
   updatedAt: null
 };
 
+let cloudUser = null;
 let selectedCountry = null;
 let stops = [];
 let mapMode = "visited";
@@ -51,14 +52,44 @@ class SupabaseStore {
   ready() {
     return Boolean(this.client);
   }
+  async refreshUser() {
+    const { data, error } = await this.client.auth.getUser();
+    if (error) {
+      cloudUser = null;
+      return null;
+    }
+    cloudUser = data.user || null;
+    return cloudUser;
+  }
+  async signUp(email, password) {
+    const { data, error } = await this.client.auth.signUp({ email, password });
+    if (error) throw error;
+    cloudUser = data.user || null;
+    return data;
+  }
+  async signIn(email, password) {
+    const { data, error } = await this.client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    cloudUser = data.user || null;
+    return data;
+  }
+  async signOut() {
+    const { error } = await this.client.auth.signOut();
+    if (error) throw error;
+    cloudUser = null;
+  }
   async load() {
-    const { data, error } = await this.client.from("travel_profiles").select("data").eq("profile_key", "default").maybeSingle();
+    const user = cloudUser || await this.refreshUser();
+    if (!user) throw new Error("Sign in before loading cloud data");
+    const { data, error } = await this.client.from("travel_profiles").select("data").eq("user_id", user.id).maybeSingle();
     if (error) throw error;
     return data?.data || null;
   }
   async save(nextState) {
-    const payload = { profile_key: "default", data: nextState, updated_at: new Date().toISOString() };
-    const { error } = await this.client.from("travel_profiles").upsert(payload, { onConflict: "profile_key" });
+    const user = cloudUser || await this.refreshUser();
+    if (!user) throw new Error("Sign in before syncing");
+    const payload = { user_id: user.id, data: nextState, updated_at: new Date().toISOString() };
+    const { error } = await this.client.from("travel_profiles").upsert(payload, { onConflict: "user_id" });
     if (error) throw error;
     return nextState;
   }
@@ -90,9 +121,14 @@ async function loadState() {
     if (local) state = normalizeImported(local);
     const cloud = getStore();
     if (cloud instanceof SupabaseStore && cloud.ready()) {
-      const remote = await cloud.load();
-      if (remote) state = normalizeImported(remote);
-      $("syncStatus").textContent = "Supabase connected. Cloud data loaded.";
+      const user = await cloud.refreshUser();
+      if (user) {
+        const remote = await cloud.load();
+        if (remote) state = normalizeImported(remote);
+        $("syncStatus").textContent = `Signed in as ${user.email}. Cloud data loaded.`;
+      } else {
+        $("syncStatus").textContent = "Supabase configured. Sign in to sync your private cloud data.";
+      }
     }
   } catch (error) {
     $("syncStatus").textContent = `Cloud unavailable: ${error.message}`;
@@ -105,7 +141,7 @@ function queueSave() {
   saveTimer = window.setTimeout(async () => {
     await new LocalStore().save(state);
     const store = getStore();
-    if (store instanceof SupabaseStore && store.ready()) {
+    if (store instanceof SupabaseStore && store.ready() && cloudUser) {
       try {
         await store.save(state);
         $("syncStatus").textContent = `Synced ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
@@ -254,6 +290,7 @@ function renderProfile() {
   const config = getCloudConfig() || {};
   $("supabaseUrl").value = config.url || "";
   $("supabaseAnon").value = config.anonKey || "";
+  if (cloudUser) $("syncStatus").textContent = `Signed in as ${cloudUser.email}.`;
 }
 
 function render() {
@@ -568,11 +605,67 @@ function bindEvents() {
     if (action === "reset-data" && confirm("Erase all local travel data?")) { state.trips = []; state.wishlist = []; queueSave(); toast("Local data erased"); }
     if (action === "save-cloud") {
       localStorage.setItem(CLOUD_KEY, JSON.stringify({ url: $("supabaseUrl").value.trim(), anonKey: $("supabaseAnon").value.trim() }));
+      cloudUser = null;
       toast("Supabase config saved");
     }
+    if (action === "sign-up") {
+      const store = getStore();
+      const email = $("authEmail").value.trim();
+      const password = $("authPassword").value;
+      if (!(store instanceof SupabaseStore) || !store.ready()) return toast("Save Supabase config first", true);
+      if (!email || password.length < 6) return toast("Add email and 6+ char password", true);
+      store.signUp(email, password).then(async () => {
+        $("syncStatus").textContent = cloudUser ? `Account created for ${cloudUser.email}.` : "Check your email to confirm the account.";
+        if (cloudUser) await store.save(state);
+        toast("Account created");
+      }).catch((error) => toast(error.message, true));
+    }
+    if (action === "sign-in") {
+      const store = getStore();
+      const email = $("authEmail").value.trim();
+      const password = $("authPassword").value;
+      if (!(store instanceof SupabaseStore) || !store.ready()) return toast("Save Supabase config first", true);
+      if (!email || !password) return toast("Add email and password", true);
+      store.signIn(email, password).then(async () => {
+        const remote = await store.load();
+        if (remote) state = normalizeImported(remote);
+        else await store.save(state);
+        $("authPassword").value = "";
+        $("syncStatus").textContent = `Signed in as ${cloudUser.email}.`;
+        render();
+        toast("Signed in");
+      }).catch((error) => toast(error.message, true));
+    }
+    if (action === "sign-out") {
+      const store = getStore();
+      if (!(store instanceof SupabaseStore) || !store.ready()) return toast("No Supabase session", true);
+      store.signOut().then(() => {
+        $("syncStatus").textContent = "Signed out. Local data stays on this device.";
+        toast("Signed out");
+      }).catch((error) => toast(error.message, true));
+    }
     if (action === "sync-now") {
-      queueSave();
-      toast("Sync queued");
+      const store = getStore();
+      if (!(store instanceof SupabaseStore) || !store.ready()) return toast("Save Supabase config first", true);
+      store.save(state).then(() => {
+        $("syncStatus").textContent = `Synced as ${cloudUser.email}.`;
+        toast("Synced");
+      }).catch((error) => toast(error.message, true));
+    }
+    if (action === "pull-cloud") {
+      const store = getStore();
+      if (!(store instanceof SupabaseStore) || !store.ready()) return toast("Save Supabase config first", true);
+      store.load().then((remote) => {
+        if (remote) {
+          state = normalizeImported(remote);
+          new LocalStore().save(state);
+          render();
+          $("syncStatus").textContent = `Pulled cloud data for ${cloudUser.email}.`;
+          toast("Cloud data loaded");
+        } else {
+          toast("No cloud backup yet");
+        }
+      }).catch((error) => toast(error.message, true));
     }
   });
   $("purposeList").addEventListener("click", (event) => {

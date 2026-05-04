@@ -10,16 +10,17 @@ Open `index.html` directly, or serve the folder with any static server.
 npx serve .
 ```
 
-## Supabase setup
+## Supabase setup with users
 
 1. Create a Supabase project.
 2. Open the SQL editor and run `supabase-schema.sql`.
-3. Open the app, go to Profile, paste your Supabase URL and anon key.
-4. Tap Save config, then Sync now.
+3. In Supabase, go to **Authentication > Providers** and keep Email enabled.
+4. Open the app, go to Profile, paste your Supabase URL and anon key.
+5. Tap Save config.
+6. Create an account or sign in with email/password.
+7. Tap Sync now.
 
-The app remains local-first: it always writes to `localStorage` and mirrors to Supabase when credentials are configured.
-
-## Added basics
+The app remains local-first: it always writes to `localStorage` and mirrors to Supabase only for the signed-in user.
 
 - PWA manifest and service worker.
 - Import and export JSON backups.

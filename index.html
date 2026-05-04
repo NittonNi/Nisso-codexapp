@@ -89,9 +89,27 @@
           <label for="supabaseAnon">Supabase anon key</label>
           <input id="supabaseAnon" type="password" placeholder="eyJ..." />
         </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="authEmail">Email</label>
+            <input id="authEmail" type="email" placeholder="you@email.com" autocomplete="email" />
+          </div>
+          <div class="field">
+            <label for="authPassword">Password</label>
+            <input id="authPassword" type="password" placeholder="Minimum 6 chars" autocomplete="current-password" />
+          </div>
+        </div>
         <div class="button-row">
           <button class="btn ghost" data-action="save-cloud">Save config</button>
+          <button class="btn" data-action="sign-in">Sign in</button>
+        </div>
+        <div class="button-row auth-row">
+          <button class="btn ghost" data-action="sign-up">Create account</button>
+          <button class="btn ghost" data-action="sign-out">Sign out</button>
+        </div>
+        <div class="button-row auth-row">
           <button class="btn" data-action="sync-now">Sync now</button>
+          <button class="btn ghost" data-action="pull-cloud">Pull cloud</button>
         </div>
         <p class="muted" id="syncStatus">Local-first mode. Add Supabase credentials when ready.</p>
       </section>
