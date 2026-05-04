@@ -1,6 +1,10 @@
 const TOTAL_COUNTRIES = 195;
 const STORAGE_KEY = "nisso_state_v8";
 const CLOUD_KEY = "nisso_supabase_config";
+const DEFAULT_SUPABASE_CONFIG = {
+  url: "https://vpisjnqvxbitbytjkukc.supabase.co",
+  anonKey: "sb_publishable_spsUUbtH09Ksbam9h4Tc8g_-VwDoppv"
+};
 
 const COUNTRIES = [
   ["AF","Afghanistan","🇦🇫","Asia"],["AL","Albania","🇦🇱","Europe"],["DZ","Algeria","🇩🇿","Africa"],["AD","Andorra","🇦🇩","Europe"],["AO","Angola","🇦🇴","Africa"],["AR","Argentina","🇦🇷","Americas"],["AM","Armenia","🇦🇲","Asia"],["AU","Australia","🇦🇺","Oceania"],["AT","Austria","🇦🇹","Europe"],["AZ","Azerbaijan","🇦🇿","Asia"],["BS","Bahamas","🇧🇸","Americas"],["BH","Bahrain","🇧🇭","Middle East"],["BD","Bangladesh","🇧🇩","Asia"],["BE","Belgium","🇧🇪","Europe"],["BZ","Belize","🇧🇿","Americas"],["BO","Bolivia","🇧🇴","Americas"],["BA","Bosnia & Herzegovina","🇧🇦","Europe"],["BR","Brazil","🇧🇷","Americas"],["BG","Bulgaria","🇧🇬","Europe"],["CA","Canada","🇨🇦","Americas"],["CL","Chile","🇨🇱","Americas"],["CN","China","🇨🇳","Asia"],["CO","Colombia","🇨🇴","Americas"],["CR","Costa Rica","🇨🇷","Americas"],["HR","Croatia","🇭🇷","Europe"],["CY","Cyprus","🇨🇾","Europe"],["CZ","Czechia","🇨🇿","Europe"],["DK","Denmark","🇩🇰","Europe"],["DO","Dominican Republic","🇩🇴","Americas"],["EC","Ecuador","🇪🇨","Americas"],["EG","Egypt","🇪🇬","Middle East"],["EE","Estonia","🇪🇪","Europe"],["FI","Finland","🇫🇮","Europe"],["FR","France","🇫🇷","Europe"],["GE","Georgia","🇬🇪","Asia"],["DE","Germany","🇩🇪","Europe"],["GR","Greece","🇬🇷","Europe"],["GT","Guatemala","🇬🇹","Americas"],["HU","Hungary","🇭🇺","Europe"],["IS","Iceland","🇮🇸","Europe"],["IN","India","🇮🇳","Asia"],["ID","Indonesia","🇮🇩","Asia"],["IE","Ireland","🇮🇪","Europe"],["IL","Israel","🇮🇱","Middle East"],["IT","Italy","🇮🇹","Europe"],["JP","Japan","🇯🇵","Asia"],["JO","Jordan","🇯🇴","Middle East"],["KE","Kenya","🇰🇪","Africa"],["KR","South Korea","🇰🇷","Asia"],["LV","Latvia","🇱🇻","Europe"],["LT","Lithuania","🇱🇹","Europe"],["LU","Luxembourg","🇱🇺","Europe"],["MY","Malaysia","🇲🇾","Asia"],["MV","Maldives","🇲🇻","Asia"],["MT","Malta","🇲🇹","Europe"],["MX","Mexico","🇲🇽","Americas"],["MA","Morocco","🇲🇦","Africa"],["NL","Netherlands","🇳🇱","Europe"],["NZ","New Zealand","🇳🇿","Oceania"],["NO","Norway","🇳🇴","Europe"],["PE","Peru","🇵🇪","Americas"],["PH","Philippines","🇵🇭","Asia"],["PL","Poland","🇵🇱","Europe"],["PT","Portugal","🇵🇹","Europe"],["QA","Qatar","🇶🇦","Middle East"],["RO","Romania","🇷🇴","Europe"],["RU","Russia","🇷🇺","Europe"],["SA","Saudi Arabia","🇸🇦","Middle East"],["SG","Singapore","🇸🇬","Asia"],["SK","Slovakia","🇸🇰","Europe"],["SI","Slovenia","🇸🇮","Europe"],["ZA","South Africa","🇿🇦","Africa"],["ES","Spain","🇪🇸","Europe"],["SE","Sweden","🇸🇪","Europe"],["CH","Switzerland","🇨🇭","Europe"],["TH","Thailand","🇹🇭","Asia"],["TR","Turkey","🇹🇷","Europe"],["AE","United Arab Emirates","🇦🇪","Middle East"],["GB","United Kingdom","🇬🇧","Europe"],["US","United States","🇺🇸","Americas"],["UY","Uruguay","🇺🇾","Americas"],["VN","Vietnam","🇻🇳","Asia"]
@@ -96,7 +100,12 @@ class SupabaseStore {
 }
 
 function getCloudConfig() {
-  try { return JSON.parse(localStorage.getItem(CLOUD_KEY) || "null"); } catch { return null; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(CLOUD_KEY) || "null");
+    return saved?.url && saved?.anonKey ? saved : DEFAULT_SUPABASE_CONFIG;
+  } catch {
+    return DEFAULT_SUPABASE_CONFIG;
+  }
 }
 
 function getStore() {
@@ -614,9 +623,9 @@ function bindEvents() {
       const password = $("authPassword").value;
       if (!(store instanceof SupabaseStore) || !store.ready()) return toast("Save Supabase config first", true);
       if (!email || password.length < 6) return toast("Add email and 6+ char password", true);
-      store.signUp(email, password).then(async () => {
-        $("syncStatus").textContent = cloudUser ? `Account created for ${cloudUser.email}.` : "Check your email to confirm the account.";
-        if (cloudUser) await store.save(state);
+      store.signUp(email, password).then(async (data) => {
+        $("syncStatus").textContent = data.session ? `Account created for ${cloudUser.email}.` : "Check your email to confirm the account, then sign in.";
+        if (data.session && cloudUser) await store.save(state);
         toast("Account created");
       }).catch((error) => toast(error.message, true));
     }

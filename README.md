@@ -15,10 +15,9 @@ npx serve .
 1. Create a Supabase project.
 2. Open the SQL editor and run `supabase-schema.sql`.
 3. In Supabase, go to **Authentication > Providers** and keep Email enabled.
-4. Open the app, go to Profile, paste your Supabase URL and anon key.
-5. Tap Save config.
-6. Create an account or sign in with email/password.
-7. Tap Sync now.
+4. Open the app. The Supabase URL and publishable key are already preconfigured.
+5. Create an account or sign in with email/password from Profile.
+6. Tap Sync now.
 
 The app remains local-first: it always writes to `localStorage` and mirrors to Supabase only for the signed-in user.
 
