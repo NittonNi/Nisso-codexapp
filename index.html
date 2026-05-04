@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta id="theme-meta" name="theme-color" content="#0c0c0c" />
+  <title>Nisso - Premium Travel Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="app">
+    <button class="theme-btn" id="themeBtn" aria-label="Toggle theme">☀</button>
+    <button class="fab" id="fab" aria-label="Log trip">+</button>
+
+    <main class="screen active" id="screen-map">
+      <section class="map-wrap">
+        <div class="map-loader" id="mapLoader">
+          <div class="loader-ring"></div>
+          <div class="loader-copy">Loading map</div>
+        </div>
+        <svg id="mapSvg" viewBox="0 0 900 440" aria-label="Interactive world map">
+          <rect width="900" height="440" fill="transparent"></rect>
+        </svg>
+        <div class="map-toggle" aria-label="Map layer">
+          <button class="active" data-map-mode="visited">Visited</button>
+          <button data-map-mode="wishlist">Wishlist</button>
+        </div>
+      </section>
+
+      <section class="dash">
+        <div class="stats-grid">
+          <article class="stat"><strong id="statPct">0%</strong><span>World</span></article>
+          <article class="stat"><strong id="statCountries">0</strong><span>Countries</span></article>
+          <article class="stat"><strong id="statTrips">0</strong><span>Trips</span></article>
+          <article class="stat"><strong id="statDays">0</strong><span>Days Away</span></article>
+        </div>
+        <div class="insights" id="insights"></div>
+      </section>
+    </main>
+
+    <main class="screen" id="screen-countries">
+      <header class="screen-head">
+        <p>Exploration</p>
+        <h1>Countries</h1>
+      </header>
+      <div class="search-row">
+        <input id="countrySearch" type="search" placeholder="Search country, region or status..." autocomplete="off" />
+      </div>
+      <div class="tabs" id="regionTabs"></div>
+      <section class="list" id="countryList"></section>
+    </main>
+
+    <main class="screen" id="screen-roadmap">
+      <header class="screen-head">
+        <p>Chronicles</p>
+        <h1>Roadmap</h1>
+      </header>
+      <div class="tabs" id="yearTabs"></div>
+      <section class="timeline" id="timeline"></section>
+    </main>
+
+    <main class="screen" id="screen-profile">
+      <section class="profile-hero">
+        <div class="avatar">N</div>
+        <h1 id="profileName">Traveler</h1>
+        <p id="profileHandle">@houseofnisso</p>
+        <button class="text-btn" data-action="edit-profile">Edit profile</button>
+      </section>
+
+      <section class="panel">
+        <h2>Data Cloud</h2>
+        <div class="field">
+          <label for="supabaseUrl">Supabase URL</label>
+          <input id="supabaseUrl" type="url" placeholder="https://xxxx.supabase.co" />
+        </div>
+        <div class="field">
+          <label for="supabaseAnon">Supabase anon key</label>
+          <input id="supabaseAnon" type="password" placeholder="eyJ..." />
+        </div>
+        <div class="button-row">
+          <button class="btn ghost" data-action="save-cloud">Save config</button>
+          <button class="btn" data-action="sync-now">Sync now</button>
+        </div>
+        <p class="muted" id="syncStatus">Local-first mode. Add Supabase credentials when ready.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Preferences</h2>
+        <div class="chips" id="purposeList"></div>
+        <div class="inline-form">
+          <input id="newPurpose" type="text" placeholder="Add purpose..." />
+          <button class="btn icon" data-action="add-purpose">+</button>
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <button class="row-action" data-action="export-data">Export data JSON</button>
+        <label class="row-action import">
+          Import data JSON
+          <input id="importFile" type="file" accept="application/json" hidden />
+        </label>
+        <button class="row-action danger" data-action="reset-data">Erase local data</button>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Primary">
+      <button class="active" data-screen="map">Map</button>
+      <button data-screen="countries">Countries</button>
+      <button data-screen="roadmap">Roadmap</button>
+      <button data-screen="profile">Profile</button>
+    </nav>
+  </div>
+
+  <div class="overlay" id="tripOverlay" aria-hidden="true">
+    <form class="sheet" id="tripForm">
+      <button class="close" type="button" data-action="close-trip">x</button>
+      <div class="grab"></div>
+      <h2 id="tripTitle">Log Trip</h2>
+      <input type="hidden" id="tripId" />
+      <div class="field suggest">
+        <label for="countryInput">Destination Country</label>
+        <input id="countryInput" autocomplete="off" placeholder="Search country..." required />
+        <div class="suggestions" id="countrySuggestions"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="purposeInput">Purpose</label>
+          <select id="purposeInput"></select>
+        </div>
+        <div class="field">
+          <label for="statusInput">Status</label>
+          <select id="statusInput">
+            <option value="visited">Visited</option>
+            <option value="planned">Planned</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Transport</label>
+        <div class="segmented" id="transportInput">
+          <button type="button" class="active" data-value="plane">Plane</button>
+          <button type="button" data-value="train">Train</button>
+          <button type="button" data-value="car">Car</button>
+          <button type="button" data-value="ship">Ship</button>
+        </div>
+      </div>
+      <div id="stops"></div>
+      <button class="add-stop" type="button" data-action="add-stop">+ Add another stop</button>
+      <div class="field">
+        <label for="tagsInput">Tags</label>
+        <input id="tagsInput" placeholder="food, beach, solo..." />
+      </div>
+      <div class="field">
+        <label for="photoInput">Photo URL</label>
+        <input id="photoInput" placeholder="https://..." />
+      </div>
+      <div class="field">
+        <label for="notesInput">Notes</label>
+        <textarea id="notesInput" placeholder="Memories..."></textarea>
+      </div>
+      <button class="btn danger ghost hidden" type="button" id="deleteTripBtn">Delete trip</button>
+      <button class="btn" type="submit">Save Trip</button>
+    </form>
+  </div>
+
+  <div class="overlay" id="countryOverlay" aria-hidden="true">
+    <section class="sheet country-sheet">
+      <button class="close" type="button" data-action="close-country">x</button>
+      <div class="grab"></div>
+      <div id="countryDetail"></div>
+    </section>
+  </div>
+
+  <div class="overlay" id="profileOverlay" aria-hidden="true">
+    <form class="sheet" id="profileForm">
+      <button class="close" type="button" data-action="close-profile">x</button>
+      <div class="grab"></div>
+      <h2>Edit Profile</h2>
+      <div class="field">
+        <label for="profileNameInput">Name</label>
+        <input id="profileNameInput" />
+      </div>
+      <div class="field">
+        <label for="profileHandleInput">Handle</label>
+        <input id="profileHandleInput" />
+      </div>
+      <button class="btn" type="submit">Save</button>
+    </form>
+  </div>
+</body>
+</html>
